@@ -49,6 +49,8 @@ Unless the existing repository says otherwise, use:
 
 Prefer modern Next.js App Router patterns.
 
+Use React with TypeScript. React components should use `.tsx`; non-React TypeScript modules should use `.ts`. Do not introduce JavaScript/JSX files when TypeScript/TSX is suitable.
+
 Avoid adding major libraries unless they provide a meaningful advantage.
 
 Before installing a new dependency:
@@ -237,6 +239,27 @@ The architecture should support:
 - maximum player count
 - optional host approval in the future
 
+Room-code rotation is deferred beyond the MVP. Room locking is the initial control for preventing additional joins. Do not design the schema in a way that prevents rotation from being added later.
+
+---
+
+# Accepted Product Decisions
+
+These decisions are authoritative unless the product owner changes them later:
+
+- Rooms expire and may be deleted 24 hours after the last meaningful game action. Meaningful actions include creating or joining a room, drawing or redrawing, completing a turn, and host actions. Realtime presence or an open browser connection must not extend expiry.
+- Temporary disconnection must not remove a player, expire a room, or immediately transfer host status.
+- Retain room history until room expiry, even if all players are temporarily disconnected.
+- The initial room capacity is 20 players. The schema and UI must support a hard maximum of 30 players. Capacity selection is not required in the MVP.
+- Redraws are unlimited. Every drawn prompt remains visible in history with its outcome, including prompts that were redrawn.
+- A player's selected prompt level persists between turns. On their turn, they may change it before drawing; changing it also becomes their preference for future turns. If changed after a card is visible, the new level applies to the next redraw rather than changing the visible card.
+- Prompt categories remain part of the data model, but player-facing category filters are not required in the MVP.
+- When a host explicitly leaves or is removed, host status transfers transactionally to the next active player in queue order, wrapping to the first remaining player when necessary. Do not choose a random successor.
+- Everyone can see the ordered player list and a visible `Host` label. Only the host can use player-management actions.
+- Host player actions include `Kick player`, `Make host`, and `Play now`. These actions must be server-authoritative.
+- `Play now` cancels or supersedes the current turn safely, moves the selected player into the current queue position, shifts the previous current player and intervening players back while preserving their relative order, and creates a new unique turn for the selected player. Stale actions for the replaced turn must fail safely.
+- Room-code rotation is not part of the MVP.
+
 ---
 
 # Queue Behaviour
@@ -333,6 +356,8 @@ Never trust a client field such as:
 isHost: true
 
 Host status must be determined from authoritative room data.
+
+Do not transfer host status merely because the host temporarily loses their realtime connection. Host transfer occurs after an explicit leave/removal or a separately defined abandonment policy.
 
 ---
 
@@ -804,3 +829,15 @@ When reviewing changes, prioritise finding:
 10. Missing regression tests
 
 Do not focus primarily on stylistic preferences when more important correctness or security problems exist.
+
+---
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

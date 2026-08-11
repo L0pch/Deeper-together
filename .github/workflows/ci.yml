@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Database, application, and browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.113.0
+
+      - name: Start disposable Supabase stack
+        shell: bash
+        run: |
+          supabase start
+
+          while IFS='=' read -r key value; do
+            value="${value%\"}"
+            value="${value#\"}"
+            case "$key" in
+              API_URL) api_url="$value" ;;
+              PUBLISHABLE_KEY) publishable_key="$value" ;;
+            esac
+          done < <(supabase status -o env)
+
+          if [[ -z "${api_url:-}" || -z "${publishable_key:-}" ]]; then
+            echo "Supabase did not report the required local client configuration." >&2
+            exit 1
+          fi
+
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$publishable_key"
+          } >> "$GITHUB_ENV"
+
+      - name: Lint application
+        run: pnpm lint
+
+      - name: Test and lint database
+        run: |
+          supabase test db
+          supabase db lint --level warning
+
+      - name: Build production application
+        run: pnpm build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
