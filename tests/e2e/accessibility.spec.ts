@@ -52,6 +52,18 @@ test("lobby and game states meet the automated WCAG and mobile-overflow baseline
   await expectNoWcagViolations(page, "game with a visible prompt");
 
   await page.setViewportSize({ width: 390, height: 844 });
+  const promptCard = page.locator('section[aria-labelledby="prompt-heading"]');
+  const turnControls = page.locator('section[aria-labelledby="turn-controls-heading"]');
+  await expect(turnControls).toHaveCSS("position", "static");
+  const [promptBox, controlsBox] = await Promise.all([
+    promptCard.boundingBox(),
+    turnControls.boundingBox(),
+  ]);
+  expect(promptBox).not.toBeNull();
+  expect(controlsBox).not.toBeNull();
+  expect(controlsBox?.y ?? 0).toBeGreaterThanOrEqual(
+    (promptBox?.y ?? 0) + (promptBox?.height ?? 0),
+  );
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expectNoWcagViolations(page, "mobile game");
 });

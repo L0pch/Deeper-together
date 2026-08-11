@@ -50,7 +50,7 @@ export function TurnControls({ snapshot, replaceSnapshot }: TurnControlsProps) {
   }
 
   return (
-    <section aria-labelledby="turn-controls-heading" className="sticky bottom-3 z-10 rounded-2xl border border-[#cfc5b6] bg-[color:rgba(255,253,248,0.97)] p-5 shadow-[0_14px_38px_rgba(37,55,47,0.14)] backdrop-blur">
+    <section aria-labelledby="turn-controls-heading" className="rounded-2xl border border-[#cfc5b6] bg-[#fffdf8] p-5 shadow-[0_14px_38px_rgba(37,55,47,0.14)]">
       <h2 id="turn-controls-heading" className="text-lg font-semibold text-[var(--accent-strong)]">Your turn</h2>
 
       <div className="mt-4">

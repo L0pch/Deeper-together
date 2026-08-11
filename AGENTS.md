@@ -254,6 +254,7 @@ These decisions are authoritative unless the product owner changes them later:
 - The initial room capacity is 20 players. The schema and UI must support a hard maximum of 30 players. Capacity selection is not required in the MVP.
 - Redraws are unlimited. Every drawn prompt remains visible in history with its outcome, including prompts that were redrawn.
 - A player's selected prompt level persists between turns. On their turn, they may change it before drawing; changing it also becomes their preference for future turns. If changed after a card is visible, the new level applies to the next redraw rather than changing the visible card.
+- Turn controls remain in normal document flow below the prompt on every viewport. They must never stick to the viewport or cover prompt content while the player scrolls.
 - Prompt categories remain part of the data model, but player-facing category filters are not required in the MVP.
 - Prompt tags are not part of the product or data model. Keep prompt management focused on wording, level, category, and status.
 - The private Google Sheet is the production prompt source of truth. Successful syncs replace the eligible prompt bank transactionally; missing rows are archived, invalid or empty sheets leave the last successful bank unchanged, and historical draw snapshots never change.
@@ -577,7 +578,7 @@ Suggested mobile layout:
 - Current-player indicator
 - Large central prompt card
 - Level indicator
-- Sticky bottom turn controls
+- In-flow turn controls below the prompt that never obscure the card while scrolling
 - History as bottom sheet/drawer
 - Player/host controls as drawer
 
