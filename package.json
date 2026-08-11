@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:server": "next start --hostname 127.0.0.1 --port 3100",
     "test:e2e:headed": "playwright test --headed"

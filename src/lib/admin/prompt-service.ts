@@ -12,6 +12,13 @@ import type {
 } from "@/types/admin";
 import type { Json } from "@/types/json";
 
+export class AdminPromptSyncError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminPromptSyncError";
+  }
+}
+
 function asRecord(value: Json | undefined): Record<string, Json | undefined> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("invalid_admin_response");
@@ -176,7 +183,7 @@ export async function syncAdminPromptsFromGoogleSheet(): Promise<GoogleSheetSync
   const payload = await response.json() as Json;
   if (!response.ok) {
     const record = asRecord(payload);
-    throw new Error(typeof record.error === "string"
+    throw new AdminPromptSyncError(typeof record.error === "string"
       ? record.error
       : "The Google Sheet could not be synchronized.");
   }

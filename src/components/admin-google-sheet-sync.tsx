@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 
-import { syncAdminPromptsFromGoogleSheet } from "@/lib/admin/prompt-service";
+import {
+  AdminPromptSyncError,
+  syncAdminPromptsFromGoogleSheet,
+} from "@/lib/admin/prompt-service";
 import { getGameErrorMessage } from "@/lib/game/errors";
 import type { GoogleSheetSyncResult } from "@/types/admin";
 
@@ -24,9 +27,8 @@ export function AdminGoogleSheetSync({ onSynced }: AdminGoogleSheetSyncProps) {
       setResult(nextResult);
       await onSynced();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      setErrorMessage(message.startsWith("The ") || message.startsWith("Google ")
-        ? message
+      setErrorMessage(error instanceof AdminPromptSyncError
+        ? error.message
         : getGameErrorMessage(error));
     } finally {
       setIsSyncing(false);

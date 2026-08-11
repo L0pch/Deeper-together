@@ -62,12 +62,13 @@ function parsePromptRows(
   table: string[][],
   activeCategoryIds?: ReadonlySet<string>,
 ): AdminPromptTransferRow[] {
-  if (table.length < 2) {
+  const headerRow = table[0];
+  if (!headerRow) {
     throw new Error("Include a header row and at least one prompt row.");
   }
 
   const headerIndexes = new Map(
-    table[0].map((header, index) => [header.trim().toLowerCase(), index]),
+    headerRow.map((header, index) => [header.trim().toLowerCase(), index]),
   );
   for (const header of headers) {
     if (!headerIndexes.has(header)) {
@@ -75,15 +76,22 @@ function parsePromptRows(
     }
   }
 
-  if (table.length - 1 > 500) {
+  const promptRows = table.slice(1)
+    .map((row, index) => ({ row, line: index + 2 }))
+    .filter(({ row }) => row.some((value) => value.trim() !== ""));
+
+  if (promptRows.length === 0) {
+    throw new Error("Include a header row and at least one prompt row.");
+  }
+
+  if (promptRows.length > 500) {
     throw new Error("Import no more than 500 prompt rows at a time.");
   }
 
   let inheritedCategoryId = "";
   let inheritedStatus: AdminPromptTransferStatus = "active";
 
-  return table.slice(1).map((row, rowIndex) => {
-    const line = rowIndex + 2;
+  return promptRows.map(({ row, line }) => {
     const read = (header: (typeof headers)[number]) =>
       row[headerIndexes.get(header) ?? -1]?.trim() ?? "";
     const promptText = read("prompt_text");
