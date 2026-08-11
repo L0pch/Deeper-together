@@ -54,10 +54,10 @@ select is(
     from pg_catalog.pg_class as relation
     join pg_catalog.pg_namespace as namespace on namespace.oid = relation.relnamespace
     where namespace.nspname = 'public'
-      and relation.relname in ('rooms', 'room_players', 'turns', 'prompt_categories', 'prompts', 'tags', 'prompt_tags', 'prompt_draws', 'room_deck_state', 'admin_users')
+      and relation.relname in ('rooms', 'room_players', 'turns', 'prompt_categories', 'prompts', 'prompt_draws', 'room_deck_state', 'admin_users')
       and relation.relrowsecurity
   ),
-  10::bigint,
+  8::bigint,
   'RLS is enabled on every exposed application table'
 );
 

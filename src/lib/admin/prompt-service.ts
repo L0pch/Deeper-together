@@ -7,9 +7,8 @@ import type {
   AdminPromptInput,
   AdminPromptImportResult,
   AdminPromptStateAction,
-  AdminPromptTag,
   AdminPromptTransferRow,
-  AdminTagInput,
+  GoogleSheetSyncResult,
 } from "@/types/admin";
 import type { Json } from "@/types/json";
 
@@ -33,16 +32,6 @@ function asBoolean(value: Json | undefined): boolean {
 function asArray(value: Json | undefined): Json[] {
   if (!Array.isArray(value)) throw new Error("invalid_admin_response");
   return value;
-}
-
-function parseTag(value: Json): AdminPromptTag {
-  const record = asRecord(value);
-  return {
-    id: asString(record.id),
-    name: asString(record.name),
-    slug: asString(record.slug),
-    isActive: asBoolean(record.isActive),
-  };
 }
 
 function parseCategory(value: Json): AdminPromptCategory {
@@ -69,7 +58,6 @@ function parsePrompt(value: Json): AdminPrompt {
     archivedAt: record.archivedAt === null ? null : asString(record.archivedAt),
     createdAt: asString(record.createdAt),
     updatedAt: asString(record.updatedAt),
-    tags: asArray(record.tags).map(parseTag),
   };
 }
 
@@ -80,7 +68,6 @@ export function parseAdminPromptCatalog(value: Json | undefined): AdminPromptCat
   return {
     prompts: asArray(record.prompts).map(parsePrompt),
     categories: asArray(record.categories).map(parseCategory),
-    tags: asArray(record.tags).map(parseTag),
     total: record.total,
   };
 }
@@ -108,7 +95,6 @@ export async function saveAdminPrompt(input: AdminPromptInput): Promise<AdminPro
     p_prompt_text: input.promptText,
     p_level: input.level,
     p_category_id: input.categoryId,
-    p_tag_ids: input.tagIds,
     p_prompt_id: input.id ?? null,
   });
 
@@ -128,32 +114,6 @@ export async function setAdminPromptState(
 
   if (error) throw error;
   return parsePrompt(data);
-}
-
-export async function saveAdminTag(input: AdminTagInput): Promise<AdminPromptTag> {
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase.rpc("save_admin_tag", {
-    p_name: input.name,
-    p_slug: input.slug,
-    p_tag_id: input.id ?? null,
-  });
-
-  if (error) throw error;
-  return parseTag(data);
-}
-
-export async function setAdminTagActive(
-  tagId: string,
-  isActive: boolean,
-): Promise<AdminPromptTag> {
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase.rpc("set_admin_tag_active", {
-    p_tag_id: tagId,
-    p_is_active: isActive,
-  });
-
-  if (error) throw error;
-  return parseTag(data);
 }
 
 export async function importAdminPrompts(
@@ -195,8 +155,46 @@ export async function fetchAdminPromptExport(): Promise<AdminPromptTransferRow[]
       promptText: asString(record.promptText),
       level,
       categoryId: asString(record.categoryId),
-      tags: asArray(record.tags).map(asString),
       status,
     };
   });
+}
+export async function syncAdminPromptsFromGoogleSheet(): Promise<GoogleSheetSyncResult> {
+  const supabase = getSupabaseBrowserClient();
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("admin_strong_authentication_required");
+
+  const response = await fetch("/api/admin/prompts/sync", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + accessToken,
+    },
+  });
+  const payload = await response.json() as Json;
+  if (!response.ok) {
+    const record = asRecord(payload);
+    throw new Error(typeof record.error === "string"
+      ? record.error
+      : "The Google Sheet could not be synchronized.");
+  }
+
+  const record = asRecord(payload);
+  if (typeof record.total !== "number"
+    || typeof record.inserted !== "number"
+    || typeof record.updated !== "number"
+    || typeof record.archived !== "number"
+    || typeof record.syncedAt !== "string") {
+    throw new Error("google_sheet_sync_response_invalid");
+  }
+
+  return {
+    total: record.total,
+    inserted: record.inserted,
+    updated: record.updated,
+    archived: record.archived,
+    syncedAt: record.syncedAt,
+  };
 }

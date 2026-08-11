@@ -78,7 +78,7 @@ export function RoomEntryForm({ mode, defaultRoomCode = "" }: RoomEntryFormProps
       </button>
 
       <p className="text-center text-xs leading-5 text-[var(--muted)]">
-        No email or password is needed. A private guest session keeps your place when you refresh on this browser.
+        {mode === "join" ? "Tabs in the same browser share one guest player. Use a private window or another browser profile to test a second player." : "No email or password is needed. A private guest session keeps your place when you refresh on this browser."}
       </p>
     </form>
   );

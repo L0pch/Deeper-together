@@ -9,23 +9,22 @@ export type AdminPromptCategory = {
   isActive: boolean;
 };
 
-export type AdminPromptTag = {
-  id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-};
-
 export type AdminPromptTransferStatus = "active" | "inactive" | "archived";
 
 export type AdminPromptTransferRow = {
   promptText: string;
   level: PromptLevel;
   categoryId: string;
-  tags: string[];
   status: AdminPromptTransferStatus;
 };
 
+export type GoogleSheetSyncResult = {
+  total: number;
+  inserted: number;
+  updated: number;
+  archived: number;
+  syncedAt: string;
+};
 export type AdminPromptImportResult = {
   total: number;
   imported: number;
@@ -42,13 +41,11 @@ export type AdminPrompt = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  tags: AdminPromptTag[];
 };
 
 export type AdminPromptCatalog = {
   prompts: AdminPrompt[];
   categories: AdminPromptCategory[];
-  tags: AdminPromptTag[];
   total: number;
 };
 
@@ -64,11 +61,4 @@ export type AdminPromptInput = {
   promptText: string;
   level: PromptLevel;
   categoryId: string;
-  tagIds: string[];
-};
-
-export type AdminTagInput = {
-  id?: string;
-  name: string;
-  slug: string;
 };

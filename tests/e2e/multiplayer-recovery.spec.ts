@@ -189,3 +189,18 @@ test("host controls synchronize locking, play now, host transfer, and kicking", 
     await blockedContext.close();
   }
 });
+test("room code copy writes the invitation code to the clipboard", async ({ browser }) => {
+  const context = await browser.newContext({
+    permissions: ["clipboard-read", "clipboard-write"],
+  });
+  const page = await context.newPage();
+
+  try {
+    const roomCode = await createRoom(page, "Clipboard host");
+    await page.getByRole("button", { name: "Copy code" }).click();
+    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(roomCode);
+  } finally {
+    await context.close();
+  }
+});

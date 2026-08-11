@@ -68,13 +68,30 @@ export function LobbyClient({ roomCode }: LobbyClientProps) {
   }
 
   async function copyRoomCode() {
+    let copied = false;
     try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard_unavailable");
       await navigator.clipboard.writeText(code);
-      setHasCopied(true);
-      window.setTimeout(() => setHasCopied(false), 1800);
+      copied = true;
     } catch {
-      setHasCopied(false);
+      const input = document.createElement("textarea");
+      input.value = code;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.append(input);
+      input.select();
+      copied = document.execCommand("copy");
+      input.remove();
     }
+
+    if (!copied) {
+      window.prompt("Copy this room code:", code);
+      return;
+    }
+
+    setHasCopied(true);
+    window.setTimeout(() => setHasCopied(false), 1800);
   }
 
   if (isLoading && !snapshot) {

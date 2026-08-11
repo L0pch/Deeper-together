@@ -58,7 +58,6 @@ export type PromptDrawSnapshot = {
   promptText: string;
   promptLevel: PromptLevel;
   promptCategory: string;
-  promptTags: string[];
   drawNumber: number;
   outcome: DrawOutcome;
   drawnAt: string;

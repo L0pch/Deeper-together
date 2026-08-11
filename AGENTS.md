@@ -143,7 +143,7 @@ Prompts should support categories such as:
 - christian
 - hybrid
 
-The database structure should allow additional categories or tags in the future.
+The database structure should allow additional categories in the future. Prompt tags are intentionally not part of the product.
 
 Do NOT hard-code the main prompt bank into frontend source files.
 
@@ -153,20 +153,21 @@ Prompts should ultimately be stored in the database so that they can be edited w
 
 # Prompt Management
 
-The application should eventually include a protected admin interface for prompt management.
+The production prompt bank is managed through a private Google Sheet shared with approved content collaborators.
 
-Administrators should be able to:
+The sheet columns are prompt_text, level, category, and status.
 
-- Add prompts
-- Edit prompts
-- Archive prompts
-- Activate/deactivate prompts
-- Assign a level
-- Assign a category
-- Add tags
-- Search/filter prompts
-- Import prompts in bulk
-- Export prompts
+The protected administrator interface allows an authorized app administrator to trigger an immediate sync and review the resulting prompt bank. A scheduled sync provides automatic reconciliation.
+
+Supabase remains authoritative for gameplay. A sheet sync must:
+
+- validate the complete sheet before changing prompts
+- apply all changes transactionally
+- reject empty or malformed sheets without changing the current bank
+- add new rows and update matching rows
+- archive prompts removed from the sheet rather than deleting them
+- preserve all historical draw snapshots
+- use only server-side Google and Supabase credentials
 
 Changing an active prompt should affect future draws without requiring a new deployment.
 
@@ -254,6 +255,8 @@ These decisions are authoritative unless the product owner changes them later:
 - Redraws are unlimited. Every drawn prompt remains visible in history with its outcome, including prompts that were redrawn.
 - A player's selected prompt level persists between turns. On their turn, they may change it before drawing; changing it also becomes their preference for future turns. If changed after a card is visible, the new level applies to the next redraw rather than changing the visible card.
 - Prompt categories remain part of the data model, but player-facing category filters are not required in the MVP.
+- Prompt tags are not part of the product or data model. Keep prompt management focused on wording, level, category, and status.
+- The private Google Sheet is the production prompt source of truth. Successful syncs replace the eligible prompt bank transactionally; missing rows are archived, invalid or empty sheets leave the last successful bank unchanged, and historical draw snapshots never change.
 - When a host explicitly leaves or is removed, host status transfers transactionally to the next active player in queue order, wrapping to the first remaining player when necessary. Do not choose a random successor.
 - Everyone can see the ordered player list and a visible `Host` label. Only the host can use player-management actions.
 - Host player actions include `Kick player`, `Make host`, and `Play now`. These actions must be server-authoritative.

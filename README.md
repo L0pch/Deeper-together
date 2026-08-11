@@ -6,7 +6,7 @@ The application is being built with Next.js, React, TypeScript, Tailwind CSS, Su
 
 ## Current status
 
-The application foundation and secured database schema are implemented. Anonymous guest authentication, create/join flows, realtime synchronization, the normal turn loop, host/lifecycle controls, and the protected prompt-management foundation are connected. Players can draw, redraw without limits, change level for the next draw, finish or skip, and review immutable prompt history. Hosts can kick players, transfer host status, move a player into the current turn, lock the room, or close it. Authorized administrators can manage prompt wording, levels, categories, tags, activation, and archiving from `/admin` without changing previously drawn history.
+The application foundation and secured database schema are implemented. Anonymous guest authentication, create/join flows, realtime synchronization, the normal turn loop, host/lifecycle controls, and the protected prompt-management foundation are connected. Players can draw, redraw without limits, change level for the next draw, finish or skip, and review immutable prompt history. Hosts can kick players, transfer host status, move a player into the current turn, lock the room, or close it. Authorized administrators can synchronize the private shared Google Sheet from /admin and review the resulting prompt bank without changing previously drawn history.
 
 Expired rooms are deleted in bounded batches by a private hourly PostgreSQL job. Room membership, turns, draw history, and deck state are removed through database cascades only after the room's 24-hour expiry has passed.
 
@@ -40,7 +40,7 @@ The local Supabase stack requires Docker Desktop or another Docker-compatible ru
 
 Anonymous sign-ins are enabled in the committed local Supabase configuration. Production anonymous sign-ins must also be enabled in the hosted Supabase project's authentication settings.
 
-The official `@supabase/supabase-js` client is the only additional runtime dependency for this phase. It persists the anonymous browser session and calls the narrowly granted database functions; no service-role key is used by the frontend.
+The official Supabase client persists browser sessions and calls narrowly granted database functions. The official Google Auth library handles server-to-server service-account authentication for the read-only Sheets API. No service-role or Google credential is used by the frontend.
 
 ## Administrator provisioning
 
@@ -54,20 +54,19 @@ on conflict (user_id) do nothing;
 
 The administrator can then sign in at `/admin`. Every prompt-management RPC requires both a non-anonymous Supabase session and a current `admin_users` entry. Remove the allowlist row to revoke access immediately. Never put administrator credentials or a service-role key in browser environment variables.
 
-### Prompt CSV format
+### Private Google Sheet prompt bank
 
-The admin interface can download a ready-to-edit template and export the complete prompt library. CSV files use these columns:
+The private Google Sheet is the production prompt source of truth. Share the sheet with approved collaborators for content editing, and share it separately with the app's Google service-account email as a Viewer.
 
-```text
-prompt_text,level,category,tags,status
-```
+The prompt tab uses four columns: prompt_text, level, category, and status.
 
-- `level` must be `1`, `2`, or `3`.
-- `category` uses a category ID such as `secular`, `christian`, or `hybrid`.
-- `tags` contains tag slugs separated by `|`, for example `faith|growth`.
-- `status` must be `active`, `inactive`, or `archived`.
-- Each import is limited to 500 rows. A malformed row rejects the whole transaction, while prompt text already present in the library is safely skipped.
+- Level must be 1, 2, or 3.
+- Category uses secular, christian, or hybrid.
+- Status must be active, inactive, or archived.
+- Blank category or status cells inherit the previous row; a blank first status defaults to active.
+- The sync accepts 1 to 500 unique prompts. A malformed or empty sheet rejects the whole sync and leaves the existing bank unchanged.
+- A successful sync adds new prompts, updates matching prompts, and archives prompts removed from the sheet.
 
-Exports contain prompt content and management metadata only. They never contain room codes, players, room history, or conversation data.
+Vercel performs a daily automatic sync at 02:00 Singapore time. An authorized administrator can use Sync Google Sheet now at /admin for immediate updates.
 
 See `docs/architecture.md` for the accepted architecture and implementation sequence, `docs/security.md` for the security boundary, and `docs/deployment.md` for the hosted release runbook. Repository-wide engineering and product rules are in `AGENTS.md`.

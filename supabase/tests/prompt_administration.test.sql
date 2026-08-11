@@ -2,17 +2,10 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(31);
 
 insert into public.admin_users (user_id)
 values ('00000000-0000-0000-0000-0000000030a1');
-
-select set_config('test.admin_tag_one', (
-  select id::text from public.tags where slug = 'faith'
-), true);
-select set_config('test.admin_tag_two', (
-  select id::text from public.tags where slug = 'growth'
-), true);
 
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
@@ -33,7 +26,7 @@ select throws_ok(
   $$ select public.get_admin_prompt_catalog() $$,
   '42501',
   'admin_strong_authentication_required',
-  'an allowlisted anonymous guest is still rejected from administration'
+  'an allowlisted anonymous guest is rejected from administration'
 );
 
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000030b1', true);
@@ -43,7 +36,7 @@ select throws_ok(
   $$ select public.get_admin_prompt_catalog() $$,
   '42501',
   'admin_permission_required',
-  'a signed-in user outside the admin allowlist cannot read prompt administration data'
+  'a signed-in user outside the admin allowlist cannot read prompt data'
 );
 
 select throws_ok(
@@ -59,7 +52,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select is(
   (public.get_admin_prompt_catalog() ->> 'total')::integer,
   9,
-  'an allowlisted non-anonymous admin can read the seeded prompt catalog'
+  'an allowlisted admin can read the seeded prompt catalog'
 );
 
 select is(
@@ -68,77 +61,65 @@ select is(
   'the admin catalog includes prompt categories'
 );
 
-select is(
-  jsonb_array_length(public.get_admin_prompt_catalog() -> 'tags'),
-  6,
-  'the admin catalog includes the managed tag vocabulary'
+select ok(
+  not (public.get_admin_prompt_catalog() ? 'tags'),
+  'the admin catalog has no tag vocabulary'
 );
 
 select throws_ok(
   $$ select public.get_admin_prompt_catalog(repeat('x', 101)) $$,
   '22023',
   'invalid_admin_search',
-  'overlong admin searches are rejected server-side'
+  'overlong admin searches are rejected'
 );
 
 select throws_ok(
   $$ select public.get_admin_prompt_catalog(null, 4::smallint) $$,
   '22023',
   'invalid_prompt_level',
-  'invalid prompt-level filters are rejected server-side'
+  'invalid prompt-level filters are rejected'
 );
 
 select throws_ok(
   $$ select public.get_admin_prompt_catalog(null, null, 'missing') $$,
   '22023',
   'invalid_prompt_category',
-  'unknown prompt-category filters are rejected server-side'
+  'unknown category filters are rejected'
 );
 
 select throws_ok(
   $$ select public.get_admin_prompt_catalog(null, null, null, 'deleted') $$,
   '22023',
   'invalid_prompt_status',
-  'unknown prompt-status filters are rejected server-side'
+  'unknown status filters are rejected'
 );
 
 select throws_ok(
   $$ select public.get_admin_prompt_catalog(null, null, null, 'all', 0, 0) $$,
   '22023',
   'invalid_admin_pagination',
-  'invalid admin pagination is rejected server-side'
+  'invalid pagination is rejected'
 );
 
 select throws_ok(
   $$ select public.save_admin_prompt(' ', 1::smallint, 'secular') $$,
   '22023',
   'invalid_prompt_text',
-  'blank prompt text is rejected server-side'
+  'blank prompt text is rejected'
 );
 
 select throws_ok(
   $$ select public.save_admin_prompt('Valid text?', 1::smallint, 'missing') $$,
   '22023',
   'invalid_prompt_category',
-  'unknown prompt categories are rejected on save'
-);
-
-select throws_ok(
-  $$ select public.save_admin_prompt('Valid text?', 1::smallint, 'secular', array['00000000-0000-0000-0000-000000009999'::uuid]) $$,
-  '22023',
-  'invalid_prompt_tags',
-  'unknown prompt tags are rejected on save'
+  'unknown categories are rejected on save'
 );
 
 with saved as (
   select public.save_admin_prompt(
     'What helps you feel welcomed in a new group?',
     1::smallint,
-    'secular',
-    array[
-      current_setting('test.admin_tag_one')::uuid,
-      current_setting('test.admin_tag_two')::uuid
-    ]
+    'secular'
   ) as value
 )
 select set_config('test.admin_prompt_id', value ->> 'id', true)
@@ -148,14 +129,6 @@ select is(
   public.get_admin_prompt_catalog('welcomed') -> 'prompts' -> 0 ->> 'promptText',
   'What helps you feel welcomed in a new group?',
   'an admin can create a prompt'
-);
-
-select is(
-  jsonb_array_length(
-    public.get_admin_prompt_catalog('welcomed') -> 'prompts' -> 0 -> 'tags'
-  ),
-  2,
-  'a created prompt snapshots its selected tag assignments'
 );
 
 reset role;
@@ -173,13 +146,13 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select is(
   (public.get_admin_prompt_catalog('welcomed') ->> 'total')::integer,
   1,
-  'admin prompt search filters on prompt text'
+  'prompt search filters on prompt text'
 );
 
 select is(
   (public.get_admin_prompt_catalog(null, 1::smallint, 'secular') ->> 'total')::integer,
   3,
-  'admin prompt filters combine level and category'
+  'prompt filters combine level and category'
 );
 
 reset role;
@@ -203,9 +176,7 @@ with room_snapshot as (
   ) as value
   from room_snapshot, started
 )
-select
-  set_config('test.admin_history_room_id', value -> 'room' ->> 'id', true),
-  set_config('test.admin_history_turn_id', value -> 'currentTurn' ->> 'id', true)
+select set_config('test.admin_history_room_id', value -> 'room' ->> 'id', true)
 from drawn;
 
 select is(
@@ -213,7 +184,6 @@ select is(
     'What helps a group become a place of belonging?',
     2::smallint,
     'hybrid',
-    array[current_setting('test.admin_tag_two')::uuid],
     current_setting('test.admin_prompt_id')::uuid
   ) ->> 'promptText',
   'What helps a group become a place of belonging?',
@@ -223,21 +193,18 @@ select is(
 reset role;
 
 select ok(
-  (select level = 2 and category_id = 'hybrid' and updated_by = '00000000-0000-0000-0000-0000000030a1'::uuid
-   from public.prompts where id = current_setting('test.admin_prompt_id')::uuid),
-  'prompt edits persist level, category, and authoritative updater metadata'
+  (select level = 2 and category_id = 'hybrid'
+     and updated_by = '00000000-0000-0000-0000-0000000030a1'::uuid
+   from public.prompts
+   where id = current_setting('test.admin_prompt_id')::uuid),
+  'prompt edits persist metadata'
 );
 
 select is(
-  (select count(*) from public.prompt_tags where prompt_id = current_setting('test.admin_prompt_id')::uuid),
-  1::bigint,
-  'prompt edits replace tag assignments atomically'
-);
-
-select is(
-  (select prompt_text_snapshot from public.prompt_draws where room_id = current_setting('test.admin_history_room_id')::uuid),
+  (select prompt_text_snapshot from public.prompt_draws
+   where room_id = current_setting('test.admin_history_room_id')::uuid),
   'What helps you feel welcomed in a new group?',
-  'editing a prompt cannot change wording already preserved in room history'
+  'editing a prompt cannot change historical wording'
 );
 
 set local role authenticated;
@@ -253,7 +220,7 @@ select is(
 select is(
   (public.get_admin_prompt_catalog(null, null, null, 'inactive') ->> 'total')::integer,
   10,
-  'the inactive filter reflects prompt state changes'
+  'the inactive filter reflects prompt state'
 );
 
 select is(
@@ -270,13 +237,14 @@ select ok(
 select is(
   (public.get_admin_prompt_catalog(null, null, null, 'archived') ->> 'total')::integer,
   1,
-  'archived prompts remain available through the admin archive filter'
+  'archived prompts remain in the admin archive'
 );
 
 select is(
-  (select prompt_text_snapshot from public.prompt_draws where room_id = current_setting('test.admin_history_room_id')::uuid),
+  (select prompt_text_snapshot from public.prompt_draws
+   where room_id = current_setting('test.admin_history_room_id')::uuid),
   'What helps you feel welcomed in a new group?',
-  'archiving a prompt does not remove its historical draw snapshot'
+  'archiving cannot remove a historical draw'
 );
 
 select ok(
@@ -292,7 +260,7 @@ select throws_ok(
 );
 
 select throws_ok(
-  $$ select public.save_admin_prompt('Missing prompt?', 1::smallint, 'secular', array[]::uuid[], '00000000-0000-0000-0000-000000009999'::uuid) $$,
+  $$ select public.save_admin_prompt('Missing prompt?', 1::smallint, 'secular', '00000000-0000-0000-0000-000000009999'::uuid) $$,
   'P0001',
   'prompt_not_found',
   'editing an unknown prompt fails safely'

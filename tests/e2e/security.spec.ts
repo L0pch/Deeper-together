@@ -25,3 +25,16 @@ test("all application responses include the baseline security headers", async ({
     expect(response.headers()["strict-transport-security"]).toBeUndefined();
   }
 });
+test("prompt synchronization endpoints reject unauthenticated requests", async ({ request }) => {
+  const adminResponse = await request.post("/api/admin/prompts/sync");
+  expect(adminResponse.status()).toBe(401);
+  await expect(adminResponse.json()).resolves.toEqual({
+    error: "Administrator sign-in is required.",
+  });
+
+  const cronResponse = await request.get("/api/cron/prompts/sync");
+  expect(cronResponse.status()).toBe(401);
+  await expect(cronResponse.json()).resolves.toEqual({
+    error: "Unauthorized.",
+  });
+});

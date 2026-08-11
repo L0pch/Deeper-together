@@ -41,7 +41,7 @@ supabase db push
 
 Read the dry-run output before applying it. Never use `db reset --linked` against production.
 
-Do not use `--include-seed` for production. `supabase/seed.sql` is development-only. Provision the initial production prompt bank through the protected `/admin` CSV import after creating an administrator.
+Do not use --include-seed for production. supabase/seed.sql is development-only. The production prompt bank is populated by the private Google Sheet sync after the server-only credentials are configured.
 
 After migration, verify both scheduled jobs:
 
@@ -55,32 +55,39 @@ where jobname in (
 order by jobname;
 ```
 
-## 4. Provision an administrator and prompts
+## 4. Provision an administrator and private Google Sheet
 
 1. Create a non-anonymous email/password user in Supabase Authentication.
-2. From a trusted SQL session, add its Auth UUID to the allowlist:
-
-```sql
-insert into public.admin_users (user_id)
-values ('ADMIN_AUTH_USER_UUID')
-on conflict (user_id) do nothing;
-```
-
-3. Deploy the web application, sign in at `/admin`, and import the reviewed production prompt CSV.
-4. Confirm active prompts exist at levels 1, 2, and 3 before opening the site to players.
+2. From a trusted SQL session, add its Auth UUID to public.admin_users.
+3. Create a Google Cloud project, enable the Google Sheets API, create a service account, and create a JSON key for that account.
+4. Create a private Google Sheet with a tab named Prompts. Row 1 must contain prompt_text, level, category, and status.
+5. Share the sheet with approved human collaborators as Editor.
+6. Share the same sheet with the service account email as Viewer. Domain-wide delegation is not required.
+7. Copy the spreadsheet ID from the Google Sheets URL.
+8. After the application variables below are configured and deployed, sign in at /admin and choose Sync Google Sheet now.
+9. Confirm active prompts exist at levels 1, 2, and 3 before opening the site to players.
 
 ## 5. Deploy Next.js to Vercel
 
-Import the GitHub repository into Vercel and keep the detected Next.js build settings. Configure these variables separately for Preview and Production:
+Import the GitHub repository into Vercel and keep the detected Next.js build settings. Configure these browser-visible variables separately for Preview and Production:
 
-```text
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-```
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
-These two values are intended for the browser; database security must continue to rely on Auth, grants, RLS, and authoritative functions. Do not add a service-role key, database password, administrator credentials, or Supabase access token to a `NEXT_PUBLIC_` variable.
+Configure these server-only variables in Production:
 
-Point Preview deployments at staging rather than production. Redeploy after changing a browser-visible environment variable because Next.js embeds it during the build.
+- SUPABASE_SERVICE_ROLE_KEY
+- GOOGLE_SERVICE_ACCOUNT_EMAIL
+- GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+- GOOGLE_SHEETS_SPREADSHEET_ID
+- GOOGLE_SHEETS_RANGE (normally Prompts!A:D)
+- CRON_SECRET (a random value of at least 16 characters)
+
+Paste the Google private key exactly as supplied, including its BEGIN/END lines. Vercel stores multiline environment variables. Never prefix any of these server-only values with NEXT_PUBLIC_.
+
+The service-role key is used only by the protected server synchronization route. Google access uses the read-only spreadsheets scope. CRON_SECRET authenticates Vercel's daily request to /api/cron/prompts/sync.
+
+Point Preview deployments at staging rather than production. Redeploy after changing any environment variable.
 
 ## 6. Production-only security controls
 
@@ -100,8 +107,9 @@ Against the release candidate:
 3. Refresh and briefly disconnect one player; confirm authoritative recovery.
 4. Exercise lock, Play now, host transfer, kick, leave, and close controls.
 5. Test a 390-pixel mobile viewport, keyboard navigation, and a screen reader.
-6. Verify `/admin` rejects an anonymous player and accepts only the allowlisted administrator.
-7. Check that security headers are present and no service-role credential appears in downloaded JavaScript or browser network requests.
+6. Verify /admin rejects an anonymous player, accepts only the allowlisted administrator, and can synchronize the private sheet.
+7. Verify unauthenticated requests to both synchronization endpoints return 401.
+8. Check that security headers are present and no service-role or Google credential appears in downloaded JavaScript or browser network requests.
 
 The automated browser suite can target a staging deployment with `PLAYWRIGHT_BASE_URL`, but it creates temporary rooms and should not be pointed at production casually:
 
@@ -115,4 +123,4 @@ pnpm test:e2e
 - Vercel application rollback: promote the last known-good deployment.
 - Database rollback: use a reviewed forward migration. Do not edit migration history or reset production.
 - Secret exposure: revoke and rotate the credential immediately, redeploy affected environments, and audit access logs.
-- Faulty prompt content: deactivate or archive it in `/admin`; existing draw history retains its original snapshot.
+- Faulty prompt content: change its status in the private sheet and synchronize; existing draw history retains its original snapshot.

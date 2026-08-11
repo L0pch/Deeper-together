@@ -92,7 +92,6 @@ export type Database = {
           p_prompt_text: string;
           p_level: number;
           p_category_id: string;
-          p_tag_ids: string[];
           p_prompt_id: string | null;
         };
         Returns: Json;
@@ -101,20 +100,16 @@ export type Database = {
         Args: { p_prompt_id: string; p_action: string };
         Returns: Json;
       };
-      save_admin_tag: {
-        Args: { p_name: string; p_slug: string; p_tag_id: string | null };
-        Returns: Json;
-      };
-      set_admin_tag_active: {
-        Args: { p_tag_id: string; p_is_active: boolean };
-        Returns: Json;
-      };
       import_admin_prompts: {
         Args: { p_rows: Json };
         Returns: Json;
       };
       get_admin_prompt_export: {
         Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      sync_google_sheet_prompts: {
+        Args: { p_rows: Json };
         Returns: Json;
       };
       get_room_snapshot: {

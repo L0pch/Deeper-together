@@ -2,17 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-import { AdminPromptEditor } from "@/components/admin-prompt-editor";
-import { AdminImportExport } from "@/components/admin-import-export";
-import { AdminTagManager } from "@/components/admin-tag-manager";
-import { fetchAdminPromptCatalog, setAdminPromptState } from "@/lib/admin/prompt-service";
+import { AdminGoogleSheetSync } from "@/components/admin-google-sheet-sync";
+import { fetchAdminPromptCatalog } from "@/lib/admin/prompt-service";
 import { getGameErrorMessage } from "@/lib/game/errors";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
-  AdminPrompt,
   AdminPromptCatalog,
   AdminPromptFilters,
-  AdminPromptStateAction,
   AdminPromptStatus,
 } from "@/types/admin";
 import type { PromptLevel } from "@/types/game";
@@ -31,7 +27,6 @@ export function AdminClient() {
   const [catalog, setCatalog] = useState<AdminPromptCatalog | null>(null);
   const [filters, setFilters] = useState<AdminPromptFilters>(initialFilters);
   const [draftFilters, setDraftFilters] = useState<AdminPromptFilters>(initialFilters);
-  const [editingPrompt, setEditingPrompt] = useState<AdminPrompt | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isWorking, setIsWorking] = useState(false);
@@ -105,7 +100,6 @@ export function AdminClient() {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signOut();
     setCatalog(null);
-    setEditingPrompt(null);
     setPassword("");
     setAccessState("sign-in");
     setIsWorking(false);
@@ -125,21 +119,6 @@ export function AdminClient() {
 
   async function refreshCatalog() {
     await loadCatalog(filters);
-  }
-
-  async function handlePromptState(prompt: AdminPrompt, action: AdminPromptStateAction) {
-    if (action === "archive" && !window.confirm("Archive this prompt? It will stop appearing in future draws.")) return;
-    setIsWorking(true);
-    setErrorMessage(null);
-    try {
-      await setAdminPromptState(prompt.id, action);
-      if (editingPrompt?.id === prompt.id) setEditingPrompt(null);
-      await refreshCatalog();
-    } catch (error) {
-      setErrorMessage(getGameErrorMessage(error));
-    } finally {
-      setIsWorking(false);
-    }
   }
 
   if (accessState === "loading") {
@@ -193,30 +172,11 @@ export function AdminClient() {
 
       {errorMessage ? <p role="alert" className="rounded-xl border border-[#e2b9aa] bg-[#fff3ee] px-4 py-3 text-sm leading-6 text-[#7b3521]">{errorMessage}</p> : null}
 
-      <AdminPromptEditor
-        key={editingPrompt?.id ?? "new-prompt"}
-        categories={catalog.categories}
-        editingPrompt={editingPrompt}
-        onCancelEdit={() => setEditingPrompt(null)}
-        onSaved={async () => {
-          setEditingPrompt(null);
-          await refreshCatalog();
-        }}
-        tags={catalog.tags}
-      />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AdminTagManager onChanged={refreshCatalog} tags={catalog.tags} />
-        <AdminImportExport
-          categories={catalog.categories}
-          onImported={refreshCatalog}
-          tags={catalog.tags}
-        />
-      </div>
+      <AdminGoogleSheetSync onSynced={refreshCatalog} />
 
       <section aria-labelledby="prompt-library-heading">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--warm)]">Prompt library</p>
-        <h2 id="prompt-library-heading" className="mt-1 text-2xl font-semibold text-[var(--accent-strong)]">Find and manage cards</h2>
+        <h2 id="prompt-library-heading" className="mt-1 text-2xl font-semibold text-[var(--accent-strong)]">Review synchronized cards</h2>
 
         <form onSubmit={(event) => void handleFilterSubmit(event)} className="mt-4 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
           <label className="text-xs font-semibold text-[var(--muted)] lg:col-span-2">
@@ -258,18 +218,6 @@ export function AdminClient() {
                     <span className={`rounded-full px-3 py-1 ${prompt.isActive && !prompt.archivedAt ? "bg-[#dfeee5] text-[#285d43]" : "bg-[#f5e2d9] text-[#7b452f]"}`}>{statusLabel}</span>
                   </div>
                   <p className="mt-3 text-base font-semibold leading-7 text-[var(--accent-strong)]">{prompt.promptText}</p>
-                  {prompt.tags.length ? <p className="mt-2 text-sm text-[var(--muted)]">{prompt.tags.map((tag) => `#${tag.slug}`).join(" · ")}</p> : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => setEditingPrompt(prompt)} disabled={isWorking} className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[#f7f4ed]">Edit</button>
-                    {prompt.archivedAt ? (
-                      <button type="button" onClick={() => void handlePromptState(prompt, "restore")} disabled={isWorking} className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[#f7f4ed]">Restore as inactive</button>
-                    ) : (
-                      <>
-                        <button type="button" onClick={() => void handlePromptState(prompt, prompt.isActive ? "deactivate" : "activate")} disabled={isWorking} className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-[var(--accent-strong)] hover:bg-[#f7f4ed]">{prompt.isActive ? "Deactivate" : "Activate"}</button>
-                        <button type="button" onClick={() => void handlePromptState(prompt, "archive")} disabled={isWorking} className="min-h-11 rounded-full border border-[#d6a99a] px-4 text-sm font-semibold text-[#8a3d2a] hover:bg-[#fff0eb]">Archive</button>
-                      </>
-                    )}
-                  </div>
                 </li>
               );
             })}
